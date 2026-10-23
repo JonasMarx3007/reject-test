@@ -1,0 +1,2 @@
+This commit intentionally carries prohibited attribution metadata.
+It exists only to verify the rendered rejection message.
