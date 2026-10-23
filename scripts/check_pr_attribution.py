@@ -7,7 +7,6 @@ import json
 import os
 import re
 import sys
-from html import escape
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -49,9 +48,9 @@ def inspect(pr_author: str | None, commits: Iterable[dict[str, Any]]) -> list[Fi
     if _is_denied_login(pr_author):
         findings.append(Finding("pull request", f"GitHub author @{pr_author}"))
 
-    for index, item in enumerate(commits, start=1):
+    for item in commits:
         sha = str(item.get("sha", "unknown"))[:12]
-        location = f"commit {sha} (#{index})"
+        location = f"commit {sha}"
 
         for role in ("author", "committer"):
             account = item.get(role) or {}
@@ -122,10 +121,20 @@ def _set_status(api_url: str, repository: str, sha: str, token: str, state: str,
     )
 
 
+def _markdown_code(value: str) -> str:
+    """Render untrusted text as a single-line Markdown code span."""
+    one_line = " ".join(value.splitlines())
+    backtick_runs = re.findall(r"`+", one_line)
+    fence = "`" * (max((len(run) for run in backtick_runs), default=0) + 1)
+    padding = " " if one_line.startswith("`") or one_line.endswith("`") else ""
+    return f"{fence}{padding}{one_line}{padding}{fence}"
+
+
 def rejection_body(findings: list[Finding]) -> str:
     shown = findings[:20]
     details = [
-        f"- **{escape(finding.location)}:** `{escape(finding.reason)}`"
+        f"- **Location:** {_markdown_code(finding.location)}  \n"
+        f"  **Detected attribution:** {_markdown_code(finding.reason)}"
         for finding in shown
     ]
     if len(findings) > len(shown):
@@ -135,7 +144,7 @@ def rejection_body(findings: list[Finding]) -> str:
             "## Pull request rejected",
             "",
             "This pull request was automatically closed because prohibited "
-            "Claude/Anthropic attribution was found:",
+            "Claude/Anthropic attribution metadata was found:",
             "",
             *details,
             "",

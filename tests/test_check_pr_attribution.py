@@ -73,8 +73,20 @@ class AttributionPolicyTests(unittest.TestCase):
             [MODULE.Finding("commit abc123", "co-author Claude <noreply@anthropic.com>")]
         )
         self.assertIn("Pull request rejected", body)
-        self.assertIn("commit abc123", body)
-        self.assertIn("noreply@anthropic.com", body)
+        self.assertIn("**Location:** `commit abc123`", body)
+        self.assertIn("`co-author Claude <noreply@anthropic.com>`", body)
+        self.assertNotIn("&lt;", body)
+
+    def test_commit_location_does_not_look_like_a_pull_request_reference(self):
+        findings = MODULE.inspect("alice", [commit(message="")])
+        self.assertEqual(findings, [])
+
+        findings = MODULE.inspect(
+            "alice",
+            [commit(message="Co-authored-by: Claude <noreply@anthropic.com>")],
+        )
+        self.assertEqual(findings[0].location, "commit 0123456789ab")
+        self.assertNotIn("#", findings[0].location)
 
     def test_rejection_requests_changes_then_closes_pull_request(self):
         finding = MODULE.Finding("commit abc123", "co-author Claude <noreply@anthropic.com>")
