@@ -198,8 +198,8 @@ def rejection_body(findings: list[Finding]) -> str:
             "",
             *details,
             "",
-            "Remove the prohibited attribution from every commit, rewrite the "
-            "branch history, and open a new pull request.",
+            "Review the change, remove the detected attribution from the indicated "
+            "location, rewrite commit history when applicable, and open a new pull request.",
         ]
     )
 
