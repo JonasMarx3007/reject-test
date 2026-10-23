@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+from html import escape
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -121,6 +122,52 @@ def _set_status(api_url: str, repository: str, sha: str, token: str, state: str,
     )
 
 
+def rejection_body(findings: list[Finding]) -> str:
+    shown = findings[:20]
+    details = [
+        f"- **{escape(finding.location)}:** `{escape(finding.reason)}`"
+        for finding in shown
+    ]
+    if len(findings) > len(shown):
+        details.append(f"- …and {len(findings) - len(shown)} additional finding(s).")
+    return "\n".join(
+        [
+            "## Pull request rejected",
+            "",
+            "This pull request was automatically closed because prohibited "
+            "Claude/Anthropic attribution was found:",
+            "",
+            *details,
+            "",
+            "Remove the prohibited attribution from every commit, rewrite the "
+            "branch history, and open a new pull request.",
+        ]
+    )
+
+
+def _reject_pull_request(
+    api_url: str,
+    repository: str,
+    number: int,
+    token: str,
+    findings: list[Finding],
+) -> None:
+    base_url = f"{api_url}/repos/{repository}/pulls/{number}"
+    body = rejection_body(findings)
+
+    try:
+        _github_request(
+            f"{base_url}/reviews",
+            token,
+            method="POST",
+            payload={"body": body, "event": "REQUEST_CHANGES"},
+        )
+    except urllib.error.HTTPError as exc:
+        print(f"Could not submit a changes-requested review: HTTP {exc.code}", file=sys.stderr)
+
+    _github_request(base_url, token, method="PATCH", payload={"state": "closed"})
+
+
 def main() -> int:
     event_path = Path(os.environ["GITHUB_EVENT_PATH"])
     event = json.loads(event_path.read_text(encoding="utf-8"))
@@ -140,6 +187,7 @@ def main() -> int:
             for finding in findings:
                 print(f"- {finding.location}: {finding.reason}", file=sys.stderr)
             _set_status(api_url, repository, head_sha, token, "failure", "Rejected: Claude/Anthropic attribution detected")
+            _reject_pull_request(api_url, repository, number, token, findings)
             return 1
 
         _set_status(api_url, repository, head_sha, token, "success", "No Claude/Anthropic attribution detected")
