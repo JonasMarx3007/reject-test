@@ -22,8 +22,9 @@ CLAUDE_BOT_EMAIL = re.compile(
     r"^(?:\d+\+)?(?:anthropic|claude|claude-code)\[bot\]@users\.noreply\.github\.com$",
     re.I,
 )
-CLAUDE_MODEL_IDENTITY = re.compile(
-    r"^(?:anthropic|claude\s+(?:code|ai|opus|sonnet|haiku)(?:\s+\d+(?:\.\d+)*)?)$",
+CLAUDE_ATTRIBUTION_IDENTITY = re.compile(
+    r"^(?:anthropic|claude\s*\(anthropic\)|"
+    r"claude\s+(?:opus|sonnet|haiku|fable|mythos)\s+\d+(?:\.\d+)*)$",
     re.I,
 )
 COAUTHOR = re.compile(
@@ -37,9 +38,9 @@ CLAUDE_SESSION = re.compile(
 )
 CLAUDE_CODE_GENERATED = re.compile(
     r"^[ ]{0,3}(?:[*_]{1,2}[ \t]*)?(?:🤖[ \t]*)?"
-    r"generated[ \t]+(?:by|with)[ \t]+"
+    r"generated[ \t]+(?:by|with|using)[ \t]+"
     r"(?:\[claude code\]\([^\r\n)]+\)|claude code)"
-    r"[ \t]*(?:[*_]{1,2})?[ \t]*$",
+    r"[ \t]*[.!:]?[ \t]*(?:[*_]{1,2})?[ \t]*[.!:]?[ \t]*$",
     re.I | re.M,
 )
 
@@ -64,7 +65,7 @@ def _is_denied_identity(name: str | None, email: str | None) -> bool:
     return bool(
         ANTHROPIC_EMAIL.search(clean_email)
         or CLAUDE_BOT_EMAIL.fullmatch(clean_email)
-        or (clean_name and CLAUDE_MODEL_IDENTITY.fullmatch(clean_name))
+        or (clean_name and CLAUDE_ATTRIBUTION_IDENTITY.fullmatch(clean_name))
     )
 
 
