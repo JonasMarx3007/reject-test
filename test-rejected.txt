@@ -1,0 +1,1 @@
+This pull request deliberately carries prohibited co-author metadata.
