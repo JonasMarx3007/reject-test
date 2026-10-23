@@ -2,6 +2,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import call, patch
 
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "check_pr_attribution.py"
@@ -66,6 +67,38 @@ class AttributionPolicyTests(unittest.TestCase):
             [commit(author_name="Claude Bernard", author_email="claude@example.com")],
         )
         self.assertEqual(findings, [])
+
+    def test_rejection_body_explains_the_finding(self):
+        body = MODULE.rejection_body(
+            [MODULE.Finding("commit abc123", "co-author Claude <noreply@anthropic.com>")]
+        )
+        self.assertIn("Pull request rejected", body)
+        self.assertIn("commit abc123", body)
+        self.assertIn("noreply@anthropic.com", body)
+
+    def test_rejection_requests_changes_then_closes_pull_request(self):
+        finding = MODULE.Finding("commit abc123", "co-author Claude <noreply@anthropic.com>")
+        with patch.object(MODULE, "_github_request") as request:
+            MODULE._reject_pull_request(
+                "https://api.github.test",
+                "owner/repository",
+                7,
+                "token",
+                [finding],
+            )
+
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args_list[0].kwargs["method"], "POST")
+        self.assertEqual(request.call_args_list[0].kwargs["payload"]["event"], "REQUEST_CHANGES")
+        self.assertEqual(
+            request.call_args_list[1],
+            call(
+                "https://api.github.test/repos/owner/repository/pulls/7",
+                "token",
+                method="PATCH",
+                payload={"state": "closed"},
+            ),
+        )
 
 
 if __name__ == "__main__":

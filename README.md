@@ -11,9 +11,10 @@ The policy inspects:
 - `Co-authored-by` trailers in commit messages.
 
 The workflow runs from the trusted default branch with minimal permissions. It
-never checks out or executes code from the pull request. A failed policy check is
-reported on the pull request's head commit under the status name
-`Claude attribution policy`.
+never checks out or executes code from the pull request. When attribution is
+detected, the workflow requests changes with an explanation, closes the pull
+request, and reports a failed status named `Claude attribution policy` on the
+pull request's head commit.
 
 This is a metadata policy, not an AI detector. It cannot identify undisclosed use
 of Claude when the attribution has been removed.
