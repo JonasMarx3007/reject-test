@@ -24,3 +24,5 @@ of Claude when the attribution has been removed.
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+<!-- policy test v4 -->
