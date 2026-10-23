@@ -114,6 +114,7 @@ class AttributionPolicyTests(unittest.TestCase):
         self.assertIn("**Location:** `commit abc123`", body)
         self.assertIn("**Evidence:**", body)
         self.assertIn("`Co-authored-by trailer: Claude <noreply@anthropic.com>`", body)
+        self.assertIn("from the indicated location", body)
         self.assertNotIn("&lt;", body)
 
     def test_commit_location_does_not_look_like_a_pull_request_reference(self):
