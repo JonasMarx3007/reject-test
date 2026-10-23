@@ -19,6 +19,21 @@ pull request's head commit.
 This is a metadata policy, not an AI detector. It cannot identify undisclosed use
 of Claude when the attribution has been removed.
 
+## When the policy runs
+
+The workflow is triggered by `pull_request_target` events (`opened`, `reopened`,
+`synchronize`, `ready_for_review`). Pushes straight to `main` are not inspected,
+so every change should arrive through a pull request.
+
+## Test scenarios
+
+| Scenario | Expected result |
+| --- | --- |
+| Commits with only human author, committer and trailers | `Claude attribution policy` succeeds and the pull request stays open |
+| A `Co-authored-by` trailer with an `@anthropic.com` address | Changes requested, pull request closed, status fails |
+| A Git author or committer using an `@anthropic.com` address | Changes requested, pull request closed, status fails |
+| A pull request or commit linked to a `claude` / `anthropic` GitHub login | Changes requested, pull request closed, status fails |
+
 ## Local test
 
 ```powershell
