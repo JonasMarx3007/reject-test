@@ -10,7 +10,7 @@ The policy inspects:
 - Git author and committer names and email addresses;
 - `Co-authored-by` trailers in commit messages.
 
-The workflow runs from the protected default branch with minimal permissions. It
+The workflow runs from the trusted default branch with minimal permissions. It
 never checks out or executes code from the pull request. A failed policy check is
 reported on the pull request's head commit under the status name
 `Claude attribution policy`.
@@ -21,6 +21,5 @@ of Claude when the attribution has been removed.
 ## Local test
 
 ```powershell
-py -3 -m unittest discover -s tests -v
+python -m unittest discover -s tests -v
 ```
-
