@@ -37,9 +37,19 @@ class AttributionPolicyTests(unittest.TestCase):
     def test_clean_pull_request_passes(self):
         self.assertEqual(MODULE.inspect("alice", [commit()]), [])
 
-    def test_claude_pull_request_author_is_rejected(self):
-        findings = MODULE.inspect("claude", [commit()])
-        self.assertTrue(any("@claude" in finding.reason for finding in findings))
+    def test_human_like_claude_and_anthropic_logins_are_not_rejected(self):
+        for login in ("claude", "claude-smith", "anthropicfan"):
+            with self.subTest(login=login):
+                self.assertEqual(MODULE.inspect(login, [commit()]), [])
+
+    def test_claude_bot_pull_request_author_is_rejected(self):
+        for login in ("claude[bot]", "claude-code[bot]", "anthropic[bot]"):
+            with self.subTest(login=login):
+                findings = MODULE.inspect(login, [commit()])
+                self.assertTrue(any(f"@{login}" in finding.reason for finding in findings))
+
+    def test_unrelated_bot_with_claude_in_its_name_is_not_rejected(self):
+        self.assertEqual(MODULE.inspect("claude-smith[bot]", [commit()]), [])
 
     def test_claude_github_commit_author_is_rejected(self):
         findings = MODULE.inspect("alice", [commit(author_login="claude[bot]")])
@@ -55,7 +65,12 @@ class AttributionPolicyTests(unittest.TestCase):
     def test_claude_coauthor_trailer_is_rejected(self):
         message = "Add feature\n\nCo-authored-by: Claude <noreply@anthropic.com>"
         findings = MODULE.inspect("alice", [commit(message=message)])
-        self.assertTrue(any("co-author Claude" in finding.reason for finding in findings))
+        self.assertTrue(any("Co-authored-by trailer: Claude" in finding.reason for finding in findings))
+
+    def test_indented_claude_coauthor_trailer_is_rejected(self):
+        message = "Add feature\n\n   Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>"
+        findings = MODULE.inspect("alice", [commit(message=message)])
+        self.assertTrue(any("Co-authored-by trailer: Claude Opus 5.5" in finding.reason for finding in findings))
 
     def test_plain_claude_reference_is_not_rejected(self):
         findings = MODULE.inspect("alice", [commit(message="Document Claude policy")])
@@ -70,11 +85,12 @@ class AttributionPolicyTests(unittest.TestCase):
 
     def test_rejection_body_explains_the_finding(self):
         body = MODULE.rejection_body(
-            [MODULE.Finding("commit abc123", "co-author Claude <noreply@anthropic.com>")]
+            [MODULE.Finding("commit abc123", "Co-authored-by trailer: Claude <noreply@anthropic.com>")]
         )
         self.assertIn("Pull request rejected", body)
         self.assertIn("**Location:** `commit abc123`", body)
-        self.assertIn("`co-author Claude <noreply@anthropic.com>`", body)
+        self.assertIn("**Evidence:**", body)
+        self.assertIn("`Co-authored-by trailer: Claude <noreply@anthropic.com>`", body)
         self.assertNotIn("&lt;", body)
 
     def test_commit_location_does_not_look_like_a_pull_request_reference(self):
@@ -89,7 +105,10 @@ class AttributionPolicyTests(unittest.TestCase):
         self.assertNotIn("#", findings[0].location)
 
     def test_rejection_requests_changes_then_closes_pull_request(self):
-        finding = MODULE.Finding("commit abc123", "co-author Claude <noreply@anthropic.com>")
+        finding = MODULE.Finding(
+            "commit abc123",
+            "Co-authored-by trailer: Claude <noreply@anthropic.com>",
+        )
         with patch.object(MODULE, "_github_request") as request:
             MODULE._reject_pull_request(
                 "https://api.github.test",
@@ -111,6 +130,30 @@ class AttributionPolicyTests(unittest.TestCase):
                 payload={"state": "closed"},
             ),
         )
+
+    def test_pull_requests_over_api_limit_fail_before_loading_commits(self):
+        with patch.object(MODULE, "_github_request") as request:
+            with self.assertRaisesRegex(MODULE.IncompleteInspectionError, "251 commits"):
+                MODULE._load_all_commits(
+                    "https://api.github.test",
+                    "owner/repository",
+                    7,
+                    "token",
+                    expected_count=251,
+                )
+        request.assert_not_called()
+
+    def test_incomplete_commit_list_fails_closed(self):
+        with patch.object(MODULE, "_github_request", return_value=[commit()]) as request:
+            with self.assertRaisesRegex(MODULE.IncompleteInspectionError, "reported 2"):
+                MODULE._load_all_commits(
+                    "https://api.github.test",
+                    "owner/repository",
+                    7,
+                    "token",
+                    expected_count=2,
+                )
+        request.assert_called_once()
 
 
 if __name__ == "__main__":
